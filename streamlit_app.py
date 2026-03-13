@@ -6,201 +6,148 @@ import kagglehub
 import os
 from PIL import Image
 
-# --- CONFIGURACIÓN DE LA PÁGINA ---
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(
     page_title="Sandra Villegas - Talento Tech",
     page_icon="🎓",
     layout="wide"
 )
 
-# --- SOLUCIÓN AL ERROR: CSS PROFESIONAL ---
-# Se cambió 'unsafe_allow_stdio' por 'unsafe_allow_html'
+# --- ESTILOS CSS (CORREGIDO unsafe_allow_html) ---
 st.markdown("""
     <style>
     .main { background-color: #f8f9fa; }
     .stButton>button { 
-        width: 100%; 
-        border-radius: 12px; 
-        background-color: #1f77b4; 
-        color: white; 
-        font-weight: bold;
-        height: 3.5em;
-        border: none;
-        transition: 0.3s;
+        width: 100%; border-radius: 12px; background-color: #1f77b4; 
+        color: white; font-weight: bold; height: 3.5em; border: none;
     }
-    .stButton>button:hover { background-color: #155a8a; border: 1px solid #ffffff; }
-    .help-icon { color: #1f77b4; font-size: 1.3rem; font-weight: bold; }
+    .help-icon { color: #1f77b4; font-size: 1.2rem; font-weight: bold; }
     .doc-box {
-        padding: 20px;
-        background-color: #ffffff;
-        border-left: 5px solid #1f77b4;
-        border-radius: 8px;
+        padding: 20px; background-color: #ffffff;
+        border-left: 5px solid #1f77b4; border-radius: 8px;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
     </style>
     """, unsafe_allow_html=True)
 
-# --- CARGA DE DATOS (Kaggle) ---
+# --- CARGA Y LIMPIEZA DE DATOS (SOLUCIÓN AL KEYERROR) ---
 @st.cache_data
 def load_data():
     try:
-        # Descarga automática desde Kaggle
         path = kagglehub.dataset_download("sehaj1104/student-productivity-and-digital-distraction-dataset")
         files = [f for f in os.listdir(path) if f.endswith('.csv')]
         if not files: return None
+        
         full_path = os.path.join(path, files[0])
         df = pd.read_csv(full_path)
-        # Limpieza de nombres de columnas
-        df.columns = [c.strip() for c in df.columns]
+        
+        # NORMALIZACIÓN DE COLUMNAS:
+        # 1. Quitamos espacios al inicio/final
+        # 2. Reemplazamos espacios internos por guiones bajos
+        df.columns = df.columns.str.strip().str.replace(' ', '_')
+        
         return df
     except Exception as e:
-        st.error(f"Error en la conexión con Kaggle: {e}")
+        st.error(f"Error al cargar datos: {e}")
         return None
 
-# --- SISTEMA DE NAVEGACIÓN ---
+# --- NAVEGACIÓN ---
 if 'view' not in st.session_state:
     st.session_state.view = 'landing'
 
-# --- 1. LANDING PAGE ---
+# --- LANDING PAGE ---
 if st.session_state.view == 'landing':
-    st.title("🚀 Impacto de la Distracción Digital")
-    st.markdown("### Proyecto Integrador de Análisis de Datos | Talento Tech")
+    st.title("🚀 Análisis de Productividad Digital")
+    st.write("### Proyecto Integrador | Sandra Villegas")
     st.markdown("---")
     
-    col_info, col_img = st.columns([1, 1], gap="large")
+    col_l, col_r = st.columns([1, 1], gap="large")
     
-    with col_info:
-        st.subheader("Entendiendo el Dataset")
+    with col_l:
+        st.subheader("Sobre el Proyecto")
         st.write("""
-            Este análisis aborda uno de los desafíos más grandes de la educación moderna: 
-            **¿Cómo influyen nuestros dispositivos en nuestra capacidad de producir resultados?**
+            Bienvenidos al panel de análisis de Talento Tech. Este estudio investiga 
+            cómo las distracciones tecnológicas afectan el rendimiento académico.
             
-            A través de este panel, Sandra Villegas explora la relación entre:
-            - **Nivel de Distracción Digital:** El ruido tecnológico constante.
-            - **Puntaje de Productividad:** La eficiencia percibida del estudiante.
-            - **Hábitos de Estudio:** La inversión de tiempo vs. resultados.
-            
-            Utilizamos técnicas avanzadas de visualización para identificar si la tecnología 
-            es un catalizador o un obstáculo.
+            **Variables Clave:**
+            - **Productividad:** Nivel de eficiencia en tareas.
+            - **Distracción Digital:** Interrupciones por dispositivos.
+            - **Estudio:** Horas dedicadas al aprendizaje.
         """)
-        if st.button("INGRESAR AL PANEL DE TRABAJO ➡️"):
+        if st.button("INGRESAR AL PANEL DE TRABAJO 📈"):
             st.session_state.view = 'dashboard'
             st.rerun()
 
-    with col_img:
+    with col_r:
         try:
-            # Se usa la imagen proporcionada por el usuario
             image = Image.open("digitalDistraction.jpg")
             st.image(image, caption="Analista: Sandra Villegas", use_container_width=True)
         except:
-            st.info("💡 Coloque el archivo 'digitalDistraction.jpg' en la raíz para visualizar la imagen temática.")
+            st.info("💡 Coloca 'digitalDistraction.jpg' en la carpeta para ver la imagen.")
 
-    st.markdown("---")
-    st.write("**Desarrollado por:** Sandra Villegas")
-
-# --- 2. PANEL DE TRABAJO (DASHBOARD) ---
+# --- DASHBOARD (SOLUCIÓN A LOS ERRORES DE COLUMNA) ---
 elif st.session_state.view == 'dashboard':
-    st.sidebar.title("⚙️ Configuración")
-    st.sidebar.markdown(f"**Usuario:** Sandra Villegas")
+    st.sidebar.title("⚙️ Controles")
     if st.sidebar.button("🏠 Regresar al Inicio"):
         st.session_state.view = 'landing'
         st.rerun()
-    
+
     df = load_data()
-    
+
     if df is not None:
         st.title("📊 Panel de Análisis Experto")
-        st.markdown("Visualización de variables críticas de productividad.")
         
+        # Validación de columnas antes de calcular métricas
+        target_cols = ['Productivity_Score', 'Digital_Distraction_Score', 'Study_Hours']
+        
+        # Verificamos cuáles columnas del dataset coinciden con lo que buscamos
+        missing_cols = [c for c in target_cols if c not in df.columns]
+        
+        if missing_cols:
+            st.warning(f"Atención: No se encontraron las columnas: {missing_cols}")
+            st.write("Columnas detectadas en el archivo:", list(df.columns))
+            # Intento de mapeo automático si los nombres son parecidos
+            st.stop() # Detenemos la ejecución para evitar el error de KPI
+
         # --- KPIs ---
-        kpi1, kpi2, kpi3 = st.columns(3)
-        kpi1.metric("Total Estudiantes", len(df))
-        kpi2.metric("Media Productividad", f"{df['Productivity_Score'].mean():.2f}")
-        kpi3.metric("Promedio Distracción", f"{df['Digital_Distraction_Score'].mean():.2f}")
+        k1, k2, k3 = st.columns(3)
+        k1.metric("Estudiantes", len(df))
+        k2.metric("Media Productividad", f"{df['Productivity_Score'].mean():.2f}")
+        k3.metric("Media Distracción", f"{df['Digital_Distraction_Score'].mean():.2f}")
 
         st.markdown("---")
 
-        # --- GRÁFICO 1: MAPA DE CALOR (CORRELACIÓN) ---
-        st.header("1. Sinergia y Correlación de Variables")
-        tab1, tab2, tab3 = st.tabs(["📊 Gráfico de Calor", "❓ Explicación", "📖 Documentación"])
+        # --- GRÁFICO 1: CORRELACIÓN ---
+        st.header("1. Mapa de Calor (Seaborn)")
+        t1, t2, t3 = st.tabs(["📊 Gráfico", "❓ Ayuda", "📖 Documentación"])
         
-        with tab1:
+        with t1:
             fig, ax = plt.subplots(figsize=(10, 6))
-            # Filtrar solo columnas numéricas
-            numeric_cols = df.select_dtypes(include=['float64', 'int64'])
-            sns.heatmap(numeric_cols.corr(), annot=True, cmap="YlGnBu", ax=ax)
+            sns.heatmap(df.select_dtypes(include=['number']).corr(), annot=True, cmap="mako", ax=ax)
             st.pyplot(fig)
-        
-        with tab2:
-            st.markdown("### <span class='help-icon'>❓</span> Interpretación del Experto")
-            st.markdown("""
-                <div class='doc-box'>
-                Este mapa utiliza el coeficiente de Pearson. Los valores cercanos a <b>-1</b> 
-                indican una relación inversa fuerte. Si observamos colores oscuros entre la 
-                distracción y la productividad, confirmamos que el uso de dispositivos 
-                perjudica directamente el rendimiento académico.
-                </div>
-            """, unsafe_allow_html=True)
-            
-        with tab3:
-            st.markdown("#### Detalles Técnicos")
-            st.code("sns.heatmap(df.corr(), annot=True, cmap='YlGnBu')")
-            st.write("Librería: Seaborn. Permite identificar patrones de dependencia lineal entre variables cuantitativas.")
+        with t2:
+            st.markdown("<div class='doc-box'>Este gráfico muestra la relación entre variables. Un valor negativo fuerte entre distracción y productividad confirma el impacto negativo del celular.</div>", unsafe_allow_html=True)
+        with t3:
+            st.code("sns.heatmap(df.corr(), annot=True, cmap='mako')")
 
         st.markdown("---")
 
-        # --- GRÁFICO 2: REGRESIÓN LINEAL (IMPACTO) ---
-        st.header("2. Tendencia: Distracción vs Productividad")
-        tab1, tab2, tab3 = st.tabs(["📊 Gráfico Regresión", "❓ Explicación", "📖 Documentación"])
+        # --- GRÁFICO 2: REGRESIÓN ---
+        st.header("2. Impacto: Distracción vs Productividad")
+        t1, t2, t3 = st.tabs(["📊 Gráfico", "❓ Ayuda", "📖 Documentación"])
         
-        with tab1:
+        with t1:
             fig, ax = plt.subplots(figsize=(10, 5))
             sns.regplot(data=df, x='Digital_Distraction_Score', y='Productivity_Score', 
-                        scatter_kws={'alpha':0.4}, line_kws={'color':'#d62728'}, ax=ax)
+                        scatter_kws={'alpha':0.4}, line_kws={'color':'red'}, ax=ax)
             st.pyplot(fig)
-            
-        with tab2:
-            st.markdown("### <span class='help-icon'>❓</span> ¿Qué nos dice la tendencia?")
-            st.markdown("""
-                <div class='doc-box'>
-                La línea roja representa la tendencia promedio. Una pendiente descendente es la 
-                prueba estadística de que a mayor distracción digital, los niveles de productividad 
-                tienden a caer de forma sistemática en la población estudiantil.
-                </div>
-            """, unsafe_allow_html=True)
+        with t2:
+            st.markdown("<div class='doc-box'>La línea roja muestra la tendencia: si baja, significa que a más distracción, menos productividad hay.</div>", unsafe_allow_html=True)
+        with t3:
+            st.write("Gráfico de regresión lineal para identificar tendencias de comportamiento.")
 
-        with tab3:
-            st.markdown("#### Implementación")
-            st.write("Utilizamos `sns.regplot` para combinar un diagrama de dispersión con un ajuste de modelo lineal.")
-
-        st.markdown("---")
-
-        # --- GRÁFICO 3: DISTRIBUCIÓN POR GÉNERO ---
-        if 'Gender' in df.columns:
-            st.header("3. Distribución de Productividad por Género")
-            tab1, tab2, tab3 = st.tabs(["📊 Gráfico de Violín", "❓ Explicación", "📖 Documentación"])
-            
-            with tab1:
-                fig, ax = plt.subplots(figsize=(10, 5))
-                sns.violinplot(data=df, x='Gender', y='Productivity_Score', palette="Set2", ax=ax)
-                st.pyplot(fig)
-                
-            with tab2:
-                st.markdown("### <span class='help-icon'>❓</span> Análisis de Densidad")
-                st.markdown("""
-                    <div class='doc-box'>
-                    El gráfico de violín nos muestra dónde se concentra la mayor cantidad de estudiantes. 
-                    Si el 'cuerpo' del violín está más arriba en un género, ese grupo muestra una 
-                    mayor resiliencia a las distracciones digitales.
-                    </div>
-                """, unsafe_allow_html=True)
-
-            with tab3:
-                st.markdown("#### Documentación")
-                st.write("`sns.violinplot` es superior al boxplot porque muestra la distribución de probabilidad de los datos.")
-
-        # Tabla de datos crudos
-        with st.expander("📂 Explorar registros originales (Dataset de Kaggle)"):
-            st.dataframe(df, use_container_width=True)
+        with st.expander("📂 Explorar Datos Crudos"):
+            st.dataframe(df)
     else:
-        st.error("Error crítico: No se pudo cargar el dataset desde Kagglehub.")
+        st.error("No se pudo cargar el dataset.")
+
